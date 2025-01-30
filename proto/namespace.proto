@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+import "test.proto";
+
+message NameSpace {
+  oneof child {
+    TestMessage test_message = 1;
+    pbm_IOState io_state = 2;
+  }
+}

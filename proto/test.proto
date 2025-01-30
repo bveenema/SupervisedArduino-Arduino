@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+message TestMessage {
+  uint32 number = 1;
+}
+
+message pbm_IOState {
+  bool pIO0 = 1;
+  bool pIO1 = 2;
+  bool pIO2 = 3;
+  bool pIO3 = 4;
+  bool pIO4 = 5;
+  bool pIO5 = 6;
+  bool pDI6 = 7;
+  bool pDI7 = 8;
+  bool pDI8 = 9;
+  uint32 pA9 = 10;
+  uint32 pA10 = 11;
+  uint32 pA11 = 12;
+  uint32 pA12 = 13;
+}
