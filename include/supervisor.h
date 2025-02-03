@@ -12,7 +12,7 @@ public:
         return instance;
     }
 
-    void Send();
+    void send();
 
     SuperMessage msg;
 

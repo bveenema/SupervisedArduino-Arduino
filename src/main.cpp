@@ -35,8 +35,11 @@ void loop() {
     // Log the IO state
     Supervisor.msg.has_io_state = true;
     Supervisor.msg.io_state = io_state;
+  }
 
-    // pb_send();
-    Supervisor.Send();
+  static uint32_t sendTimer = 0;
+  if(millis() - sendTimer >= 100) {
+    sendTimer = millis();
+    Supervisor.send();
   }
 }
