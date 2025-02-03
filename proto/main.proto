@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+import "io_state.proto";
+import "logger.proto";
+
+message MainMessage {
+  LogMessage log = 1;
+  IOState io_state = 2;
+}

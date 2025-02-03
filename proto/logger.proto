@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+enum LogMessageLevel {
+    unspecified = 0;
+    debug = 1;
+    info = 2;
+    warn = 3;
+    error = 4;
+    fatal = 5;
+}
+
+message LogMessage {
+    LogMessageLevel level = 1;
+    string message = 2;
+}
