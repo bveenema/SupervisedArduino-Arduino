@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-enum LogMessageLevel {
+enum SuperLogLevel {
     unspecified = 0;
     debug = 1;
     info = 2;
@@ -9,7 +9,7 @@ enum LogMessageLevel {
     fatal = 5;
 }
 
-message LogMessage {
-    LogMessageLevel level = 1;
+message SuperLogMessage {
+    SuperLogLevel level = 1;
     string message = 2;
 }
