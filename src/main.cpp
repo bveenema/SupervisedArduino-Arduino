@@ -30,11 +30,11 @@ void loop() {
     digitalWrite(IO2, io_state.p_IO2);
 
     // log the current time
-    SuperLog.log(superLog::Level::INFO, "Millis: %lu", millis());
+    // SuperLog.log(superLog::Level::INFO, "Millis: %lu", millis());
 
-    // Log the IO state
-    Supervisor.msg.has_io_state = true;
-    Supervisor.msg.io_state = io_state;
+    // // Log the IO state
+    // Supervisor.msg.has_io_state = true;
+    // Supervisor.msg.io_state = io_state;
   }
 
   static uint32_t sendTimer = 0;
@@ -42,4 +42,7 @@ void loop() {
     sendTimer = millis();
     Supervisor.send();
   }
+
+  // Read the serial port
+  Supervisor.update();
 }

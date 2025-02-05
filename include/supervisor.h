@@ -13,8 +13,9 @@ public:
     }
 
     void send();
+    void update();
 
-    SuperMessage msg;
+    SuperMessage msg = SuperMessage_init_zero;
 
 private:
     supervisor();
