@@ -5,13 +5,23 @@
 #include <cstdarg>
 #include "pb_encode.h"
 #include "superlog.pb.h"
+#include "component_template.h"
 
+
+/**
+ * @brief Macro that provides access to the singleton instance of superLog.
+ * 
+ * This macro wraps the getInstance() call to provide a simpler interface.
+ * Instead of calling superLog::getInstance(), users can simply use SuperLog.
+ */
 #define SuperLog superLog::getInstance()
 
-class superLog {
+class superLog : public ComponentTemplate {
 public:
-    // Log levels
-    // These log levels are for use in the Arduino program and map to the log levels in the proto file
+    /**
+     * Log levels that map to corresponding levels defined in the proto file.
+     * Used for filtering and categorizing log messages in the Arduino program.
+     */
     enum Level {
         DEBUG = SuperLogLevel_debug,
         INFO = SuperLogLevel_info,
@@ -20,28 +30,48 @@ public:
         FATAL = SuperLogLevel_fatal
     };
 
+    /**
+     * @brief Get the singleton instance of superLog.
+     * 
+     * @return superLog& The singleton instance of superLog.
+     */
     static superLog& getInstance() {
         static superLog instance;
         return instance;
     }
 
-    // setLevel
-    /// \param level - The log level to allow, defaults to info
+
+    /**
+     * @brief Set the log level.
+     * 
+     * @param level The log level to allow, defaults to info
+     */
     void setLevel(Level level);
 
-    // log
-    /// the main logging function. Only logs if the message level is allowed. Uses printf style formatting.
-    /// \param msgLevel The level of the message
-    /// \param format The format string for the message
-    /// \param ... The arguments for the format string
+
+    /**
+     * @brief The main logging function. Only logs if the message level is allowed.
+     * 
+     * Uses printf style formatting.
+     * 
+     * @param msgLevel The level of the message
+     * @param format The format string for the message
+     * @param ... The arguments for the format string
+     * @return true if the message was logged, false if it was filtered
+     */
     bool log(const Level msgLevel, const char *format, ...);
 
 
+    bool updateMessage(SuperMessage& msg) override {
+        msg.has_log = true;
+        msg.log = pendingLog;
+        return true;
+    }
+
+
 private:
-    // These are sent by pointer to Supervisor, which gets around the private status of them.
-    // It's a bit of a hack but they are at least protected from general use.
-    SuperLogMessage logger = SuperLogMessage_init_zero;
-    char buffer[256];
+    // Custom string encoder callback for Protocol Buffers.
+    // Static to allow usage as function pointer while maintaining encapsulation.
     static bool encode_string(pb_ostream_t *stream, const pb_field_t *field, void * const *arg) {
         const char *str = (const char*)(*arg);
         if (!pb_encode_tag_for_field(stream, field)) {
@@ -56,6 +86,9 @@ private:
     superLog& operator=(const superLog&) = delete;
 
     Level allowedLevel;
+    bool hasNewMessage = false;
+    SuperLogMessage pendingLog = SuperLogMessage_init_zero;
+    char buffer[256];
 };
 
 

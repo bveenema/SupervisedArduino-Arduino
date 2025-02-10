@@ -5,22 +5,57 @@
 #include <pb_encode.h>
 #include <pb_decode.h>
 
-supervisor::supervisor() : msg(SuperMessage_init_zero), pb_out(as_pb_ostream(Serial)) {}
-
+supervisor::supervisor() : outMsg(SuperMessage_init_zero), pb_out(as_pb_ostream(Serial)) {}
 
 void supervisor::send() {
-    // Sizing the message when the size is 0 takes ~10us, 67us when the size is 22.
-    // Encoding/Sending a 22 byte message takes ~264us
-    // This was testing performed on ClearCore with a 115200 baud rate
-    // 10us penalty to check size and prevent empty sends is worth the cost but calls to supervisor::send()
-    // should be considered carefully in time critical applications.
-    size_t msg_size = 0;
-    pb_get_encoded_size(&msg_size, SuperMessage_fields, &msg);
-    if (msg_size > 0) {
-        pb_encode_ex(&pb_out, SuperMessage_fields, &msg, PB_ENCODE_DELIMITED);
+    if (pendingUpdates.none()) {  // If no bits are set
+        return;
     }
-    msg = SuperMessage_init_zero;
+
+    outMsg = SuperMessage_init_zero;
+    
+    // Only update from providers that have changes
+    for (size_t i = 0; i < providers.size(); i++) {
+        if (pendingUpdates.test(i)) {  // Check if bit is set
+            providers[i]->updateMessage(outMsg);
+        }
+    }
+    
+    pb_encode_ex(&pb_out, SuperMessage_fields, &outMsg, PB_ENCODE_DELIMITED);
+    pendingUpdates.reset();  // Clear all bits
 }
+
+void supervisor::addComponent(ComponentTemplate* provider) {
+    if (providers.size() >= MAX_PROVIDERS) {
+        // Handle error - too many providers
+        return;
+    }
+    size_t index = providers.size();
+    providers.push_back(provider);
+    provider->setSupervisor(this);
+    provider->setComponentId(index);  // Need to add this to ComponentTemplate
+}
+
+void supervisor::notifyUpdate(ComponentTemplate* provider) {
+    pendingUpdates.set(provider->getComponentId());  // Set bit to 1
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #include <stdint.h>
 #include <stddef.h>
@@ -42,7 +77,6 @@ bool decode_varint(const uint8_t *buffer, size_t buffer_size, size_t &varint_siz
     return false; // Buffer ended before varint was fully decoded
 }
 
-
 bool print_string(pb_istream_t *stream, const pb_field_t *field, void **arg) {
     uint8_t buffer[1024] = {0};
     
@@ -56,7 +90,8 @@ bool print_string(pb_istream_t *stream, const pb_field_t *field, void **arg) {
     /* Print the string, in format comparable with protoc --decode.
      * Format comes from the arg defined in main().
      */
-    printf((char*)*arg, buffer);
+    //reinterpret cast arg to char* and snprintf to arg
+    snprintf((char*)*arg, 255, "Received message: %s", buffer);
     return true;
 }
 
@@ -88,16 +123,17 @@ void supervisor::update() {
             for (size_t i = 0; i < message_size; i++) {
                 snprintf(printBuffer + i * 2, sizeof(printBuffer) - i * 2, "%02X", buffer[i]);
             }
-            Serial.println(printBuffer);
             // Decode the message
             pb_istream_t stream = pb_istream_from_buffer(buffer, message_size);
-            SuperMessage msg2 = SuperMessage_init_zero;
-            msg2.log.message.funcs.decode = &print_string;
-            msg2.log.message.arg = (void*)"%s";
-            if (pb_decode(&stream, SuperMessage_fields, &msg2)) {
+            char argBuffer[256];
+
+            inMsg.log.message.funcs.decode = &print_string;
+            inMsg.log.message.arg = (void*)argBuffer;
+            bool &ioStateTest = inMsg.has_io_state;
+            bool &logTest = inMsg.has_log;
+            if (pb_decode(&stream, SuperMessage_fields, &inMsg)) {
                 // echo the message
-                
-                snprintf(printBuffer, sizeof(printBuffer), "Received message: Level-%d, Message-%s", msg2.log.level, msg2.log.message);
+                snprintf(printBuffer, sizeof(printBuffer), "Received message: has_io_stateref-%d, has_logref-%d, has_io_state-%d, has_log-%d, Level-%d, Message-%s", ioStateTest, logTest, inMsg.has_io_state, inMsg.has_log, inMsg.log.level, argBuffer);
                 Serial.println(printBuffer);
             }
 
@@ -105,6 +141,7 @@ void supervisor::update() {
             buffer_index = 0;
             size_received = false;
             message_size = 0;
+            inMsg = SuperMessage_init_zero;
         }
     }
 }

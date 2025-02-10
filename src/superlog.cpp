@@ -1,9 +1,9 @@
 #include "superlog.h"
 #include "supervisor.h"
 
-
 superLog::superLog() {
     allowedLevel = superLog::Level::INFO;
+    Supervisor.addComponent(this);
 }
 
 void superLog::setLevel(superLog::Level level) {
@@ -22,12 +22,14 @@ bool superLog::log(const Level msgLevel, const char *format, ...) {
     vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
 
-    logger.level = (SuperLogLevel)msgLevel;
-    logger.message.funcs.encode = &encode_string;
-    logger.message.arg = buffer;
-
-    Supervisor.msg.has_log = true;
-    Supervisor.msg.log = logger;
+    // Store in pending message
+    pendingLog = SuperLogMessage_init_zero;
+    pendingLog.level = (SuperLogLevel)msgLevel;
+    pendingLog.message.funcs.encode = &encode_string;
+    pendingLog.message.arg = buffer;
+    
+    // Mark the message as updated
+    markAsUpdated();
 
     return true;
 }
