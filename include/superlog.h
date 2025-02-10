@@ -62,14 +62,8 @@ public:
     bool log(const Level msgLevel, const char *format, ...);
 
 
-    bool updateMessage(SuperMessage& msg) override {
-        msg.has_log = true;
-        msg.log = pendingLog;
-        return true;
-    }
+    bool updateMessage(SuperMessage& msg) override;
 
-
-private:
     // Custom string encoder callback for Protocol Buffers.
     // Static to allow usage as function pointer while maintaining encapsulation.
     static bool encode_string(pb_ostream_t *stream, const pb_field_t *field, void * const *arg) {

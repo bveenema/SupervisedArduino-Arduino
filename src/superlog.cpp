@@ -33,3 +33,9 @@ bool superLog::log(const Level msgLevel, const char *format, ...) {
 
     return true;
 }
+
+bool superLog::updateMessage(SuperMessage& msg) {
+        msg.has_log = true;
+        msg.log = pendingLog;
+        return true;
+    }
