@@ -2,11 +2,14 @@
 #include "supervisor.h"
 
 
-void ComponentTemplate::markAsUpdated() {
-    if (super) {
-        super->notifyUpdate(this);
-    }
-} 
-
 void ComponentTemplate::setComponentId(size_t id) { componentId = id; }
 
+size_t ComponentTemplate::getComponentId() const{ return componentId; }
+
+ComponentTemplate* ComponentTemplate::getNext() const {
+    return nextComponent;
+}
+
+void ComponentTemplate::setNext(ComponentTemplate* next) {
+    nextComponent = next;
+}

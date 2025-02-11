@@ -37,10 +37,6 @@ void loop() {
     // Supervisor.outMsg.io_state = io_state;
   }
 
-  // limit send to 10 Hz
-  Supervisor.send();
-
-
-  // Read the serial port
-  // Supervisor.update();
+  // Handle all communication (both sending and receiving)
+  Supervisor.update();
 }

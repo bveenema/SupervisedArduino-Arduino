@@ -62,11 +62,18 @@ public:
     bool log(const Level msgLevel, const char *format, ...);
 
 
-    bool updateMessage(SuperMessage& msg) override;
+    bool publish(SuperMessage& msg) override;
+    void preReceive(SuperMessage& msg) override;
+    void receive(SuperMessage& msg) override;
+
+private:
+    superLog();
+    superLog(const superLog&) = delete;
+    superLog& operator=(const superLog&) = delete;
 
     // Custom string encoder callback for Protocol Buffers.
     // Static to allow usage as function pointer while maintaining encapsulation.
-    static bool encode_string(pb_ostream_t *stream, const pb_field_t *field, void * const *arg) {
+    static bool encodeString(pb_ostream_t *stream, const pb_field_t *field, void * const *arg) {
         const char *str = (const char*)(*arg);
         if (!pb_encode_tag_for_field(stream, field)) {
             return false;
@@ -74,15 +81,23 @@ public:
         return pb_encode_string(stream, (const pb_byte_t*)str, strlen(str));
     }
 
-private:
-    superLog();
-    superLog(const superLog&) = delete;
-    superLog& operator=(const superLog&) = delete;
+    static bool decodeString(pb_istream_t *stream, const pb_field_t *field, void **arg) {
+        uint8_t buffer[1024] = {0};
+        if (stream->bytes_left > sizeof(buffer) - 1)
+            return false;
+        
+        if (!pb_read(stream, buffer, stream->bytes_left))
+            return false;
+        
+        snprintf((char*)*arg, 255, "%s", buffer);
+        return true;
+    }
 
     Level allowedLevel;
     bool hasNewMessage = false;
     SuperLogMessage pendingLog = SuperLogMessage_init_zero;
     char buffer[256];
+    static char messageBuffer[256];  // Make this static member for use in callbacks
 };
 
 

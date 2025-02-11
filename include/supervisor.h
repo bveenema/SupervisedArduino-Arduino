@@ -5,13 +5,6 @@
 #include "supervisor.pb.h"
 #include "component_template.h"
 
-// Undefine Arduino's min/max macros
-#undef min
-#undef max
-
-#include <vector>
-#include <bitset>
-
 class ComponentTemplate;
 
 class supervisor {
@@ -21,17 +14,15 @@ public:
         return instance;
     }
 
-    void send();
     void update();
-    void addComponent(ComponentTemplate* provider);
-    void notifyUpdate(ComponentTemplate* provider);
-
+    void addComponent(ComponentTemplate* component);
+    void readyToPublish(ComponentTemplate* component);
 
     SuperMessage outMsg = SuperMessage_init_zero;
     SuperMessage inMsg = SuperMessage_init_zero;
 
-    // Maximum number of providers we'll support
-    static constexpr size_t MAX_PROVIDERS = 64;
+    // Maximum number of components we'll support
+    static constexpr size_t MAX_COMPONENTS = 64;
 
 private:
     supervisor();
@@ -39,8 +30,9 @@ private:
     supervisor& operator=(const supervisor&) = delete;
 
     pb_ostream_s pb_out;
-    std::bitset<MAX_PROVIDERS> pendingUpdates;  // Each bit represents one provider
-    std::vector<ComponentTemplate*> providers;    // Index in this array corresponds to bit position
+    uint64_t pendingUpdates = 0;  // Each bit represents one component
+    ComponentTemplate* head = nullptr;  // Head of the linked list
+    size_t componentCount = 0;
 };
 
 #define Supervisor supervisor::getInstance()

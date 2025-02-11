@@ -7,58 +7,32 @@
 
 supervisor::supervisor() : outMsg(SuperMessage_init_zero), pb_out(as_pb_ostream(Serial)) {}
 
-void supervisor::send() {
-    if (pendingUpdates.none()) {  // If no bits are set
+void supervisor::addComponent(ComponentTemplate* component) {
+    if (componentCount >= MAX_COMPONENTS) {
+        // Handle error - too many components
         return;
     }
 
-    outMsg = SuperMessage_init_zero;
+    // Set the component ID
+    component->setComponentId(componentCount++);
     
-    // Only update from providers that have changes
-    for (size_t i = 0; i < providers.size(); i++) {
-        if (pendingUpdates.test(i)) {  // Check if bit is set
-            providers[i]->updateMessage(outMsg);
+    // Add to linked list
+    if (head == nullptr) {
+        head = component;
+    } else {
+        // Add to end of list
+        ComponentTemplate* current = head;
+        while (current->getNext() != nullptr) {
+            current = current->getNext();
         }
+        current->setNext(component);
     }
-    
-    pb_encode_ex(&pb_out, SuperMessage_fields, &outMsg, PB_ENCODE_DELIMITED);
-    pendingUpdates.reset();  // Clear all bits
+    component->setNext(nullptr);
 }
 
-void supervisor::addComponent(ComponentTemplate* provider) {
-    if (providers.size() >= MAX_PROVIDERS) {
-        // Handle error - too many providers
-        return;
-    }
-    size_t index = providers.size();
-    providers.push_back(provider);
-    provider->setSupervisor(this);
-    provider->setComponentId(index);  // Need to add this to ComponentTemplate
+void supervisor::readyToPublish(ComponentTemplate* component) {
+    pendingUpdates |= (1ULL << component->getComponentId());
 }
-
-void supervisor::notifyUpdate(ComponentTemplate* provider) {
-    pendingUpdates.set(provider->getComponentId());  // Set bit to 1
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#include <stdint.h>
-#include <stddef.h>
 
 bool decode_varint(const uint8_t *buffer, size_t buffer_size, size_t &varint_size, size_t &value) {
     value = 0;
@@ -77,26 +51,26 @@ bool decode_varint(const uint8_t *buffer, size_t buffer_size, size_t &varint_siz
     return false; // Buffer ended before varint was fully decoded
 }
 
-bool print_string(pb_istream_t *stream, const pb_field_t *field, void **arg) {
-    uint8_t buffer[1024] = {0};
-    
-    /* We could read block-by-block to avoid the large buffer... */
-    if (stream->bytes_left > sizeof(buffer) - 1)
-        return false;
-    
-    if (!pb_read(stream, buffer, stream->bytes_left))
-        return false;
-    
-    /* Print the string, in format comparable with protoc --decode.
-     * Format comes from the arg defined in main().
-     */
-    //reinterpret cast arg to char* and snprintf to arg
-    snprintf((char*)*arg, 255, "Received message: %s", buffer);
-    return true;
-}
-
 void supervisor::update() {
-    static char printBuffer[256];
+    // First handle sending any pending updates
+    if (pendingUpdates != 0) {  // If any bits are set
+        outMsg = SuperMessage_init_zero;
+        
+        // Only update from components that have changes
+        ComponentTemplate* current = head;
+        while (current != nullptr) {
+            size_t id = current->getComponentId();
+            if (pendingUpdates & (1ULL << id)) {
+                current->publish(outMsg);
+            }
+            current = current->getNext();
+        }
+        
+        pb_encode_ex(&pb_out, SuperMessage_fields, &outMsg, PB_ENCODE_DELIMITED);
+        pendingUpdates = 0;  // Clear all bits
+    }
+
+    // Then handle receiving any incoming messages
     static uint8_t buffer[256];
     static size_t buffer_index = 0;
     static size_t message_size = 0;
@@ -105,55 +79,56 @@ void supervisor::update() {
     while (Serial.available() > 0) {
         uint8_t byte = Serial.read();
         buffer[buffer_index++] = byte;
-        // snprintf(printBuffer, sizeof(printBuffer), "Received byte: 0x%02X", byte);
-        // Serial.println(printBuffer);
 
         if (!size_received) {
             size_t varint_size = 0;
             if (decode_varint(buffer, buffer_index, varint_size, message_size)) {
                 size_received = true;
                 buffer_index -= varint_size;
-                snprintf(printBuffer, sizeof(printBuffer), "Received message size: %d", message_size);
-                Serial.println(printBuffer);
                 memmove(buffer, buffer + varint_size, buffer_index);
             }
         }
 
         if (size_received && buffer_index >= message_size) {
-            for (size_t i = 0; i < message_size; i++) {
-                snprintf(printBuffer + i * 2, sizeof(printBuffer) - i * 2, "%02X", buffer[i]);
-            }
-            // Decode the message
+            // Convert buffer to stream
             pb_istream_t stream = pb_istream_from_buffer(buffer, message_size);
-            char argBuffer[256];
-
-            inMsg.log.message.funcs.decode = &print_string;
-            inMsg.log.message.arg = (void*)argBuffer;
-            bool &ioStateTest = inMsg.has_io_state;
-            bool &logTest = inMsg.has_log;
+            
+            // Initialize inMsg
+            inMsg = SuperMessage_init_zero;
+            
+            // Set up decode callbacks for all components
+            ComponentTemplate* current = head;
+            while (current != nullptr) {
+                current->preReceive(inMsg);
+                current = current->getNext();
+            }
+            
+            // Decode the message
             if (pb_decode(&stream, SuperMessage_fields, &inMsg)) {
-                // echo the message
-                snprintf(printBuffer, sizeof(printBuffer), "Received message: has_io_stateref-%d, has_logref-%d, has_io_state-%d, has_log-%d, Level-%d, Message-%s", ioStateTest, logTest, inMsg.has_io_state, inMsg.has_log, inMsg.log.level, argBuffer);
-                Serial.println(printBuffer);
+                // Notify all components about the new message
+                current = head;
+                while (current != nullptr) {
+                    current->receive(inMsg);
+                    current = current->getNext();
+                }
             }
 
-            // Reset for the next message
+            // Reset for next message
             buffer_index = 0;
             size_received = false;
             message_size = 0;
-            inMsg = SuperMessage_init_zero;
         }
     }
 }
 
 ///--- Instrumented version of the send function for timing analysis
 // #include "superlog.h:
-// bool encode_string(pb_ostream_t *stream, const pb_field_t *field, void * const *arg) {
+// bool encodeString(pb_ostream_t *stream, const pb_field_t *field, void * const *arg) {
 //     const char *str = (const char*)(*arg);
 //     if (!pb_encode_tag_for_field(stream, field)) {
 //         return false;
 //     }
-//     return pb_encode_string(stream, (const pb_byte_t*)str, strlen(str));
+//     return pb_encodeString(stream, (const pb_byte_t*)str, strlen(str));
 // }
 // void supervisor::send() {
 //     uint32_t startTime = micros();
@@ -172,7 +147,7 @@ void supervisor::update() {
         
 //         SuperLogMessage logger = SuperLogMessage_init_zero;
 //         logger.level = SuperLogLevel_debug;
-//         logger.message.funcs.encode = &encode_string;
+//         logger.message.funcs.encode = &encodeString;
 //         logger.message.arg = buffer;
 
 //         msg.has_log = true;
