@@ -5,7 +5,7 @@
 #include <pb_encode.h>
 #include <pb_decode.h>
 
-supervisor::supervisor() : outMsg(SuperMessage_init_zero), pb_out(as_pb_ostream(Serial)) {}
+supervisor::supervisor() : pb_out(as_pb_ostream(Serial)) {}
 
 void supervisor::addComponent(ComponentTemplate* component) {
     if (componentCount >= MAX_COMPONENTS) {
@@ -54,7 +54,7 @@ bool decode_varint(const uint8_t *buffer, size_t buffer_size, size_t &varint_siz
 void supervisor::update() {
     // First handle sending any pending updates
     if (pendingUpdates != 0) {  // If any bits are set
-        outMsg = SuperMessage_init_zero;
+        resetSuperMessage(outMsg);
         
         // Only update from components that have changes
         ComponentTemplate* current = head;
@@ -94,7 +94,7 @@ void supervisor::update() {
             pb_istream_t stream = pb_istream_from_buffer(buffer, message_size);
             
             // Initialize inMsg
-            inMsg = SuperMessage_init_zero;
+            resetSuperMessage(inMsg);
             
             // Set up decode callbacks for all components
             ComponentTemplate* current = head;
@@ -119,6 +119,10 @@ void supervisor::update() {
             message_size = 0;
         }
     }
+}
+
+void supervisor::resetSuperMessage(SuperMessage& msg) {
+    memset(&msg, 0, sizeof(SuperMessage));
 }
 
 ///--- Instrumented version of the send function for timing analysis

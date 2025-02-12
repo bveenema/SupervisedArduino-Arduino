@@ -29,6 +29,8 @@ private:
     supervisor(const supervisor&) = delete;
     supervisor& operator=(const supervisor&) = delete;
 
+    void resetSuperMessage(SuperMessage& msg);
+
     pb_ostream_s pb_out;
     uint64_t pendingUpdates = 0;  // Each bit represents one component
     ComponentTemplate* head = nullptr;  // Head of the linked list

@@ -5,8 +5,8 @@
 #include "supervisor.h"
 #include "superlog.h"
 
-#include "io_state.pb.h"
-IOState io_state = IOState_init_zero;
+// #include "io_state.pb.h"
+// IOState io_state = IOState_init_zero;
 
 void setup() {
   // Initialize the serial port
@@ -26,15 +26,15 @@ void loop() {
     printTimer = millis();
 
     // Toggle the IO pin to prove the program isn't stuck
-    io_state.p_IO2 = !io_state.p_IO2;
-    digitalWrite(IO2, io_state.p_IO2);
+    static bool p_IO2 = false;
+    digitalWrite(IO2, p_IO2);
+    p_IO2 = !p_IO2;
 
     // log the current time
     SuperLog.log(superLog::Level::INFO, "Millis: %lu", millis());
 
     // // Log the IO state
-    // Supervisor.outMsg.has_io_state = true;
-    // Supervisor.outMsg.io_state = io_state;
+    SuperLog.log(superLog::Level::INFO, "IO2: %d", digitalRead(IO2));
   }
 
   // Handle all communication (both sending and receiving)

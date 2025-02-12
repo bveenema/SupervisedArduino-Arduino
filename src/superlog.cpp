@@ -1,8 +1,6 @@
 #include "superlog.h"
 #include "supervisor.h"
 
-char superLog::messageBuffer[256];  // Define static member
-
 superLog::superLog() {
     allowedLevel = superLog::Level::INFO;
     Supervisor.addComponent(this);
@@ -24,11 +22,21 @@ bool superLog::log(const Level msgLevel, const char *format, ...) {
     vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
 
-    // Store in pending message
-    pendingLog = SuperLogMessage_init_zero;
-    pendingLog.level = (SuperLogLevel)msgLevel;
-    pendingLog.message.funcs.encode = &encodeString;
-    pendingLog.message.arg = buffer;
+    // Store in pending message array if there's space
+    if (pendingLog.logs_count >= 5) {
+        // Buffer is full, force a publish
+        Supervisor.readyToPublish(this);
+        return false;
+    }
+
+    // Add new message to the logs array
+    LogMessage* newMsg = &pendingLog.logs[pendingLog.logs_count];
+    newMsg->level = (SuperLogLevel)msgLevel;
+    strncpy(newMsg->message, buffer, sizeof(newMsg->message) - 1);
+    newMsg->message[sizeof(newMsg->message) - 1] = '\0';
+    
+    pendingLog.logs_count++;
+    pendingLog.currentLevel = (SuperLogLevel)msgLevel;
     
     // Mark the message as updated
     Supervisor.readyToPublish(this);
@@ -36,23 +44,28 @@ bool superLog::log(const Level msgLevel, const char *format, ...) {
     return true;
 }
 
-bool superLog::publish(SuperMessage& msg) {
-        msg.has_log = true;
-        msg.log = pendingLog;
-        pendingLog = SuperLogMessage_init_zero;
-        return true;
-    }
+void superLog::resetPendingLog() {
+    // Zero out the entire structure
+    memset(&pendingLog, 0, sizeof(SuperLogMessage));
+    // Only need to set currentLevel since logs_count is already 0 from memset
+    pendingLog.currentLevel = (SuperLogLevel)allowedLevel;
+}
 
-void superLog::preReceive(SuperMessage& msg) {
-    msg.log.message.funcs.decode = &decodeString;
-    msg.log.message.arg = messageBuffer;
+bool superLog::publish(SuperMessage& msg) {
+    msg.has_log = true;
+    msg.log = pendingLog;
+    resetPendingLog();
+    return true;
 }
 
 void superLog::receive(SuperMessage& msg) {
     if (msg.has_log) {
         // set the new log level
-        allowedLevel = (Level)msg.log.level;
-        // echo the message
-        log((Level)msg.log.level, "Received log: %s", messageBuffer);
+        allowedLevel = (Level)msg.log.currentLevel;
+        
+        // echo the received messages
+        for (pb_size_t i = 0; i < msg.log.logs_count; i++) {
+            log((Level)msg.log.logs[i].level, "Received log: %s", msg.log.logs[i].message);
+        }
     }
 }

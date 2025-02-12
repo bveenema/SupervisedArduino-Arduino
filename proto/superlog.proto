@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "nanopb.proto";
+
 enum SuperLogLevel {
     unspecified = 0;
     debug = 1;
@@ -9,7 +11,12 @@ enum SuperLogLevel {
     fatal = 5;
 }
 
-message SuperLogMessage {
+message LogMessage {
     SuperLogLevel level = 1;
-    string message = 2;
+    string message = 2 [(nanopb).max_size = 64];
+}
+
+message SuperLogMessage {
+    repeated LogMessage logs = 1 [(nanopb).max_count = 5];
+    SuperLogLevel currentLevel = 2;
 }
