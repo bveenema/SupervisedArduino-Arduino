@@ -4,9 +4,14 @@
 
 #include "supervisor.h"
 #include "superlog.h"
+#include "button.h"
 
-// #include "io_state.pb.h"
-// IOState io_state = IOState_init_zero;
+#define START_BUTTON_PIN IO0
+#define STOP_BUTTON_PIN IO1
+
+Button StartButton(START_BUTTON_PIN, Supervisor.outMsg.has_StartButton, Supervisor.outMsg.StartButton);
+Button StopButton(STOP_BUTTON_PIN, Supervisor.outMsg.has_StopButton, Supervisor.outMsg.StopButton);
+
 
 void setup() {
   // Initialize the serial port
@@ -17,6 +22,10 @@ void setup() {
 
   // Initialize the logger
   SuperLog.setLevel(superLog::Level::INFO);
+
+  // Initialize the buttons
+  StartButton.init();
+  StopButton.init();
 }
 
 void loop() {
@@ -39,4 +48,8 @@ void loop() {
 
   // Handle all communication (both sending and receiving)
   Supervisor.update();
+
+  // Update the buttons
+  StartButton.update();
+  StopButton.update();
 }
