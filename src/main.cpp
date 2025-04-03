@@ -5,6 +5,7 @@
 #include "supervisor.h"
 #include "superlog.h"
 #include "button.h"
+#include "io_state.h"
 
 #define START_BUTTON_PIN IO0
 #define STOP_BUTTON_PIN IO1
@@ -26,6 +27,9 @@ void setup() {
   // Initialize the buttons
   StartButton.init();
   StopButton.init();
+
+  // Initialize the IO state
+  IOState.setIO2(true);
 }
 
 void loop() {
@@ -35,9 +39,8 @@ void loop() {
     printTimer = millis();
 
     // Toggle the IO pin to prove the program isn't stuck
-    static bool p_IO2 = false;
-    digitalWrite(IO2, p_IO2);
-    p_IO2 = !p_IO2;
+    digitalWrite(IO2, IOState.getIO2());
+    IOState.setIO2(!IOState.getIO2());
 
     // log the current time
     SuperLog.log(superLog::Level::INFO, "Millis: %lu", millis());

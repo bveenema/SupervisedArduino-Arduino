@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-message IOState {
+message iostateMessage {
   bool p_IO0 = 1;
   bool p_IO1 = 2;
   bool p_IO2 = 3;

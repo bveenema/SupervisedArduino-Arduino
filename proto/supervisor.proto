@@ -6,7 +6,7 @@ import "button.proto";
 
 message SuperMessage {
   SuperLogMessage log = 1;
-  IOState io_state = 2;
+  iostateMessage io_state = 2;
   ButtonMessage StartButton = 3;
   ButtonMessage StopButton = 4;
 }

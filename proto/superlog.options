@@ -1,0 +1,2 @@
+LogMessage.message    max_size:64
+SuperLogMessage.logs  max_count:5

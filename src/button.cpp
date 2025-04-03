@@ -35,8 +35,8 @@ void Button::update() {
                     callbacks[i]();
                 }
             }
-            Supervisor.readyToPublish(this);
-        }        
+        }
+        Supervisor.readyToPublish(this);
     }
     
     lastPressed = pressed;
